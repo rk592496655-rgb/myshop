@@ -9,7 +9,13 @@ app = Flask(__name__)
 app.secret_key = os.getenv("APP_SECRET", "temporary-secret")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
-CATEGORIES = ["Android Non Root", "Android Root", "Iphone Panel"]
+CATEGORIES = [
+    "Non Root",
+    "Root - Device",
+    "iOS - iPhone",
+    "PC - Computer",
+    "Guild - Glory Bot"
+]
 
 def db():
     con = sqlite3.connect("shop.db")
