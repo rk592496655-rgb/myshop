@@ -481,13 +481,59 @@ def telegram_menu_action(chat_id, action, user=None):
         )
 
     # PROFILE
+    
     elif action == "profile":
-        name = user.get("first_name", "User") if user else "User"
-        username = user.get("username", "Not set") if user else "Not set"
+        user_id = user.get("id", chat_id) if user else chat_id
+        first_name = user.get("first_name", "User") if user else "User"
+        last_name = user.get("last_name", "") if user else ""
+        username = user.get("username") if user else None
+
+        full_name = f"{first_name} {last_name}".strip()
+        display_name = f"{full_name} (@{username})" if username else full_name
+
+        joined = "Not available"
+
+        with db() as con:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS telegram_users (
+                    user_id INTEGER PRIMARY KEY,
+                    name TEXT,
+                    username TEXT,
+                    joined TEXT
+                )
+            """)
+
+            existing = con.execute(
+                "SELECT joined FROM telegram_users WHERE user_id=?",
+                (user_id,)
+            ).fetchone()
+
+            if existing:
+                joined = existing["joined"]
+                con.execute(
+                    "UPDATE telegram_users SET name=?, username=? WHERE user_id=?",
+                    (full_name, username or "", user_id)
+                )
+            else:
+                joined = time.strftime("%Y-%m-%d")
+                con.execute(
+                    "INSERT INTO telegram_users (user_id, name, username, joined) VALUES (?, ?, ?, ?)",
+                    (user_id, full_name, username or "", joined)
+                )
+
         telegram_send(
             chat_id,
-            f"👤 YOUR PROFILE\nName: {name}\nUsername: @{username}"
-        )
+            f"👤 MY PROFILE\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"🆔 ID: {user_id}\n"
+            f"📛 Name: {display_name}\n"
+            f"💰 Balance: $0.00\n"
+            f"💳 Total Deposit: $0.00\n"
+            f"🛒 Orders: 0 · Spent: $0.00\n"
+            f"👥 Referrals: 0 · Earned: $0.00\n"
+            f"📅 Joined: {joined}"
+                )
+        
 
     elif action == "balance":
         telegram_send(chat_id, "💰 ADD BALANCE\nPlease contact Support for balance addition.")
