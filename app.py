@@ -240,3 +240,123 @@ def api_products():
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000)
+    # MY SHOP TELEGRAM WEBHOOK
+
+import requests
+
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
+TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}/"
+
+
+SHOP_KEYBOARD = {
+    "inline_keyboard": [
+        [
+            {"text": "🛒 Shop Now", "callback_data": "shop"},
+            {"text": "👤 Profile", "callback_data": "profile"}
+        ],
+        [
+            {"text": "💰 Add Balance", "callback_data": "balance"},
+            {"text": "🔑 My Keys", "callback_data": "keys"}
+        ],
+        [
+            {"text": "📖 How to Use", "callback_data": "how"},
+            {"text": "📥 Download Files", "callback_data": "downloads"}
+        ],
+        [
+            {"text": "🎁 Daily Gift", "callback_data": "gift"},
+            {"text": "🤝 Refer to Earn", "callback_data": "refer"}
+        ],
+        [
+            {"text": "🎧 Support", "callback_data": "support"},
+            {"text": "🧾 Payment Proof", "callback_data": "proof"}
+        ],
+        [
+            {"text": "👑 Reseller Upgrade", "callback_data": "reseller"}
+        ]
+    ]
+}
+
+
+def telegram_send(chat_id, message, markup=None):
+    payload = {"chat_id": chat_id, "text": message}
+    if markup:
+        payload["reply_markup"] = markup
+    requests.post(TELEGRAM_API + "sendMessage", json=payload, timeout=15)
+
+
+def telegram_menu_action(chat_id, action, user=None):
+    if action == "shop":
+        with db() as con:
+            products = con.execute(
+                "SELECT name, price, stock FROM products ORDER BY id DESC"
+            ).fetchall()
+        if not products:
+            telegram_send(chat_id, "🛍️ No products available right now.")
+        else:
+            text = "🛍️ MY SHOP PRODUCTS\n\n"
+            for p in products:
+                text += f"📦 {p['name']}\n💰 Price: ₹{p['price']}\n📊 Stock: {p['stock']}\n\n"
+            telegram_send(chat_id, text)
+
+    elif action == "profile":
+        name = user.get("first_name", "User") if user else "User"
+        username = user.get("username", "Not set") if user else "Not set"
+        telegram_send(chat_id, f"👤 YOUR PROFILE\nName: {name}\nUsername: @{username}")
+    elif action == "balance":
+        telegram_send(chat_id, "💰 ADD BALANCE\nPlease contact Support for balance addition.")
+    elif action == "keys":
+        telegram_send(chat_id, "🔑 MY KEYS\nYour purchased keys will appear here.")
+    elif action == "how":
+        telegram_send(chat_id, "📖 HOW TO USE\nSelect Shop Now to view available products.")
+    elif action == "downloads":
+        telegram_send(chat_id, "📥 DOWNLOAD FILES\nYour available downloads will appear here.")
+    elif action == "gift":
+        telegram_send(chat_id, "🎁 DAILY GIFT\nDaily gift feature is coming soon.")
+    elif action == "refer":
+        telegram_send(chat_id, "🤝 REFER TO EARN\nReferral feature is coming soon.")
+    elif action == "support":
+        telegram_send(chat_id, "🎧 SUPPORT\nPlease contact the shop administrator.")
+    elif action == "proof":
+        telegram_send(chat_id, "🧾 PAYMENT PROOF\nPlease send your payment screenshot to Support.")
+    elif action == "reseller":
+        telegram_send(chat_id, "👑 RESELLER UPGRADE\nContact Support for reseller upgrade.")
+
+
+@app.route("/telegram-webhook", methods=["POST"])
+def telegram_webhook():
+    if not BOT_TOKEN or not WEBHOOK_SECRET:
+        return jsonify({"ok": False}), 500
+
+    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
+        return jsonify({"ok": False}), 403
+
+    update = request.get_json(silent=True) or {}
+
+    callback = update.get("callback_query")
+    if callback:
+        requests.post(
+            TELEGRAM_API + "answerCallbackQuery",
+            json={"callback_query_id": callback["id"]},
+            timeout=15
+        )
+        message = callback.get("message") or {}
+        chat_id = (message.get("chat") or {}).get("id")
+        if chat_id:
+            telegram_menu_action(chat_id, callback.get("data", ""), callback.get("from", {}))
+        return jsonify({"ok": True})
+
+    message = update.get("message") or {}
+    chat_id = (message.get("chat") or {}).get("id")
+    command = message.get("text", "")
+
+    if chat_id and command == "/start":
+        telegram_send(
+            chat_id,
+            "Welcome to MY SHOP 🛍️\nPlease select a menu:",
+            SHOP_KEYBOARD
+        )
+    elif chat_id and command == "/products":
+        telegram_menu_action(chat_id, "shop")
+
+    return jsonify({"ok": True})
