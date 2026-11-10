@@ -291,42 +291,230 @@ def telegram_send(chat_id, message, markup=None):
     requests.post(TELEGRAM_API + "sendMessage", json=payload, timeout=15)
 
 
+
 def telegram_menu_action(chat_id, action, user=None):
+
+    # SHOP NOW - SHOW CATEGORIES
     if action == "shop":
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "Non Root", "callback_data": "cat_0"}],
+                [{"text": "Root - Device", "callback_data": "cat_1"}],
+                [{"text": "iOS - iPhone", "callback_data": "cat_2"}],
+                [{"text": "PC - Computer", "callback_data": "cat_3"}],
+                [{"text": "Guild - Glory Bot", "callback_data": "cat_4"}]
+            ]
+        }
+        telegram_send(chat_id, "🛍️ MY SHOP\n\nSelect a category:", keyboard)
+
+    # CATEGORY PRODUCTS
+    elif action.startswith("cat_"):
+        try:
+            index = int(action.split("_")[1])
+            category = CATEGORIES[index]
+        except (ValueError, IndexError):
+            telegram_send(chat_id, "Invalid category.")
+            return
+
         with db() as con:
             products = con.execute(
-                "SELECT name, price, stock FROM products ORDER BY id DESC"
+                "SELECT id, name, stock FROM products WHERE category=? ORDER BY id DESC",
+                (category,)
             ).fetchall()
-        if not products:
-            telegram_send(chat_id, "🛍️ No products available right now.")
-        else:
-            text = "🛍️ MY SHOP PRODUCTS\n\n"
-            for p in products:
-                text += f"📦 {p['name']}\n💰 Price: ₹{p['price']}\n📊 Stock: {p['stock']}\n\n"
-            telegram_send(chat_id, text)
 
+        keyboard = {"inline_keyboard": []}
+
+        for p in products:
+            keyboard["inline_keyboard"].append([
+                {
+                    "text": f"📦 {p['name']} | Stock: {p['stock']}",
+                    "callback_data": f"product_{p['id']}"
+                }
+            ])
+
+        keyboard["inline_keyboard"].append([
+            {"text": "⬅️ Back to Categories", "callback_data": "shop"}
+        ])
+
+        telegram_send(
+            chat_id,
+            f"📂 {category}\n\nSelect a product:",
+            keyboard
+        )
+
+    # PRODUCT DETAILS AND PLANS
+    elif action.startswith("product_"):
+        try:
+            product_id = int(action.split("_")[1])
+        except ValueError:
+            return
+
+        with db() as con:
+            product = con.execute(
+                "SELECT * FROM products WHERE id=?",
+                (product_id,)
+            ).fetchone()
+
+            plans = con.execute(
+                "SELECT * FROM plans WHERE product_id=? ORDER BY id ASC",
+                (product_id,)
+            ).fetchall()
+
+        if not product:
+            telegram_send(chat_id, "Product not found.")
+            return
+
+        keyboard = {"inline_keyboard": []}
+
+        for p in plans:
+            status = "Out of stock" if p["stock"] <= 0 else f"${p['price_usd']}"
+            keyboard["inline_keyboard"].append([
+                {
+                    "text": f"{p['name']} - {status}",
+                    "callback_data": f"plan_{p['id']}"
+                }
+            ])
+
+        keyboard["inline_keyboard"].append([
+            {"text": "📁 Files & Setup", "callback_data": f"files_{product_id}"}
+        ])
+
+        try:
+            category_index = CATEGORIES.index(product["category"])
+        except (ValueError, TypeError):
+            category_index = 0
+
+        keyboard["inline_keyboard"].append([
+            {
+                "text": "⬅️ All Products",
+                "callback_data": f"cat_{category_index}"
+            }
+        ])
+
+        telegram_send(
+            chat_id,
+            f"📦 {product['name']}\n\nSelect your plan:",
+            keyboard
+        )
+
+    # PLAN CHECKOUT
+    elif action.startswith("plan_"):
+        try:
+            plan_id = int(action.split("_")[1])
+        except ValueError:
+            return
+
+        with db() as con:
+            plan = con.execute(
+                "SELECT * FROM plans WHERE id=?",
+                (plan_id,)
+            ).fetchone()
+
+            if plan:
+                product = con.execute(
+                    "SELECT * FROM products WHERE id=?",
+                    (plan["product_id"],)
+                ).fetchone()
+            else:
+                product = None
+
+        if not plan or not product:
+            telegram_send(chat_id, "Plan not found.")
+            return
+
+        if plan["stock"] <= 0:
+            telegram_send(chat_id, "❌ This plan is out of stock.")
+            return
+
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": f"UPI India - ₹{plan['price_inr']}", "callback_data": f"pay_upi_{plan_id}"}],
+                [{"text": f"Bangladesh Pay - ৳{plan['price_inr']}", "callback_data": f"pay_bd_{plan_id}"}],
+                [{"text": f"Binance Pay - {plan['price_usd']} USDT", "callback_data": f"pay_binance_{plan_id}"}],
+                [{"text": "💰 Pay with Balance", "callback_data": f"pay_balance_{plan_id}"}],
+                [{"text": "🎟️ Apply Coupon Code", "callback_data": f"coupon_{plan_id}"}],
+                [{"text": "⬅️ All Plans", "callback_data": f"product_{product['id']}"}]
+            ]
+        }
+
+        telegram_send(
+            chat_id,
+            f"🧾 CHECKOUT SUMMARY\n\n"
+            f"Product: {product['name']}\n"
+            f"Plan: {plan['name']}\n"
+            f"Quantity: 1\n"
+            f"Unit Price: ${plan['price_usd']} USDT\n"
+            f"Final Total: ${plan['price_usd']} USDT\n\n"
+            f"📦 Available Stock: {plan['stock']}\n\n"
+            f"Choose payment method:",
+            keyboard
+        )
+
+    # PAYMENT PLACEHOLDER
+    elif action.startswith("pay_"):
+        telegram_send(
+            chat_id,
+            "💳 Payment option selected.\n\nPayment verification is not configured yet. Please contact Support."
+        )
+
+    # FILES AND SETUP
+    elif action.startswith("files_"):
+        telegram_send(
+            chat_id,
+            "📁 Files & Setup\n\nPlease contact Support for available files and setup instructions."
+        )
+
+    # COUPON
+    elif action.startswith("coupon_"):
+        telegram_send(
+            chat_id,
+            "🎟️ Coupon system is coming soon."
+        )
+
+    # MAIN MENU
+    elif action == "main_menu":
+        telegram_send(
+            chat_id,
+            "🏠 MY SHOP\n\nPlease select a menu:",
+            SHOP_KEYBOARD
+        )
+
+    # PROFILE
     elif action == "profile":
         name = user.get("first_name", "User") if user else "User"
         username = user.get("username", "Not set") if user else "Not set"
-        telegram_send(chat_id, f"👤 YOUR PROFILE\nName: {name}\nUsername: @{username}")
+        telegram_send(
+            chat_id,
+            f"👤 YOUR PROFILE\nName: {name}\nUsername: @{username}"
+        )
+
     elif action == "balance":
         telegram_send(chat_id, "💰 ADD BALANCE\nPlease contact Support for balance addition.")
+
     elif action == "keys":
         telegram_send(chat_id, "🔑 MY KEYS\nYour purchased keys will appear here.")
+
     elif action == "how":
         telegram_send(chat_id, "📖 HOW TO USE\nSelect Shop Now to view available products.")
+
     elif action == "downloads":
         telegram_send(chat_id, "📥 DOWNLOAD FILES\nYour available downloads will appear here.")
+
     elif action == "gift":
         telegram_send(chat_id, "🎁 DAILY GIFT\nDaily gift feature is coming soon.")
+
     elif action == "refer":
         telegram_send(chat_id, "🤝 REFER TO EARN\nReferral feature is coming soon.")
+
     elif action == "support":
         telegram_send(chat_id, "🎧 SUPPORT\nPlease contact the shop administrator.")
+
     elif action == "proof":
         telegram_send(chat_id, "🧾 PAYMENT PROOF\nPlease send your payment screenshot to Support.")
+
     elif action == "reseller":
         telegram_send(chat_id, "👑 RESELLER UPGRADE\nContact Support for reseller upgrade.")
+        
 
 
 @app.route("/telegram-webhook", methods=["POST"])
