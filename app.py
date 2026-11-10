@@ -303,6 +303,7 @@ def telegram_menu_action(chat_id, action, user=None):
                 [{"text": "iOS - iPhone", "callback_data": "cat_2"}],
                 [{"text": "PC - Computer", "callback_data": "cat_3"}],
                 [{"text": "Guild - Glory Bot", "callback_data": "cat_4"}]
+                {"text": "⬅️ Back to Menu", "callback_data": "main_menu"}
             ]
         }
         telegram_send(chat_id, "🛍️ MY SHOP\n\nSelect a category:", keyboard)
