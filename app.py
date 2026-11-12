@@ -593,11 +593,12 @@ def telegram_webhook():
     command = message.get("text", "")
 
     if chat_id and command == "/start":
-        telegram_send(
-            chat_id,
-            "Welcome to MY SHOP 🛍️\nPlease select a menu:",
-            SHOP_KEYBOARD
-        )
+    telegram_send(chat_id, "‎", {"remove_keyboard": True})
+    telegram_send(
+        chat_id,
+        "💎 𝐑𝐎𝐇𝐀𝐍 𝐗 𝐒𝐓𝐎𝐑𝐄 💎\n\n🎉 𝐖𝐞𝐥𝐜𝐨𝐦𝐞!\n\n✨ Select an option below to continue.",
+        SHOP_KEYBOARD
+    )
     elif chat_id and command == "/products":
         telegram_menu_action(chat_id, "shop")
 
