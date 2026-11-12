@@ -610,5 +610,25 @@ def telegram_webhook():
     return jsonify({"ok": True})
 
 
+
+    message = update.get("message") or {}
+    chat_id = (message.get("chat") or {}).get("id")
+    command = message.get("text", "")
+
+    if chat_id and command == "/start":
+        telegram_send(chat_id, "‎", {"remove_keyboard": True})
+        telegram_send(
+            chat_id,
+            "💎 𝐑𝐎𝐇𝐀𝐍 𝐗 𝐒𝐓𝐎𝐑𝐄 💎\n\n🎉 𝐖𝐞𝐥𝐜𝐨𝐦𝐞!\n\n✨ Select an option below to continue.",
+            SHOP_KEYBOARD
+        )
+
+    elif chat_id and command == "/products":
+        telegram_menu_action(chat_id, "shop")
+
+    return jsonify({"ok": True})
+
+
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000)
+    app.run(host="0.0.0.0", port=5000)
+
