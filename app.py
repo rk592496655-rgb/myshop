@@ -245,8 +245,7 @@ def api_products():
         """).fetchall()
     return jsonify([dict(p) for p in products])
 
-if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000)
+
     # MY SHOP TELEGRAM WEBHOOK
 
 import requests
@@ -565,6 +564,7 @@ def telegram_menu_action(chat_id, action, user=None):
         
 
 
+
 @app.route("/telegram-webhook", methods=["POST"])
 def telegram_webhook():
     if not BOT_TOKEN or not WEBHOOK_SECRET:
@@ -584,32 +584,15 @@ def telegram_webhook():
         )
         message = callback.get("message") or {}
         chat_id = (message.get("chat") or {}).get("id")
+
         if chat_id:
-            telegram_menu_action(chat_id, callback.get("data", ""), callback.get("from", {}))
+            telegram_menu_action(
+                chat_id,
+                callback.get("data", ""),
+                callback.get("from", {})
+            )
+
         return jsonify({"ok": True})
-
-    message = update.get("message") or {}
-    chat_id = (message.get("chat") or {}).get("id")
-    command = message.get("text", "")
-
-        if chat_id and command == "/start":
-        telegram_send(chat_id, "‎", {"remove_keyboard": True})
-        telegram_send(
-            chat_id,
-            "💎 𝐑𝐎𝐇𝐀𝐍 𝐗 𝐒𝐓𝐎𝐑𝐄 💎\n\n🎉 𝐖𝐞𝐥𝐜𝐨𝐦𝐞!\n\n✨ Select an option below to continue.",
-            SHOP_KEYBOARD
-        )
-
-    elif chat_id and command == "/products":
-        telegram_menu_action(chat_id, "shop")
-
-    return jsonify({"ok": True})
-    elif chat_id and command == "/products":
-        telegram_menu_action(chat_id, "shop")
-
-    return jsonify({"ok": True})
-
-
 
     message = update.get("message") or {}
     chat_id = (message.get("chat") or {}).get("id")
@@ -631,4 +614,4 @@ def telegram_webhook():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
+    
